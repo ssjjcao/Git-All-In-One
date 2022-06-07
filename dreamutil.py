@@ -37,17 +37,12 @@ def _get_diff_line_num(diff):
     this_modify_lines = []
     parent_line = 0
     this_line = 0
-    line_pattern = r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@"
+    line_pattern = r"@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@"
     for line in lines:
         if line.startswith("@@ -"):
             result = re.search(line_pattern, line)
-            if result is not None:
-                parent_line = int(result.group(1)) - 1
-                this_line = int(result.group(3)) - 1
-            else:
-                result_again = re.search(r"@@ -(\d+),(\d+) \+(\d+) @@", line)
-                parent_line = int(result_again.group(1)) - 1
-                this_line = int(result_again.group(3)) - 1
+            parent_line = int(result.group(1)) - 1
+            this_line = int(result.group(3)) - 1
         elif line.startswith("+"):
             this_line += 1
             this_modify_lines.append(this_line)
