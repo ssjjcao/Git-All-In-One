@@ -230,8 +230,6 @@ if __name__ == "__main__":
     a, b = _get_diff_line_num(test_repo.git.diff('32857cf57f920cdc03b5095f08febec94cf9c36b~',
                                                  "32857cf57f920cdc03b5095f08febec94cf9c36b",
                                                  '--', "net/tls/tls_main.c"))
-    c = _get_function_line_scope(git.Repo("/home/ssjjcao/linux"),
-                                 "32857cf57f920cdc03b5095f08febec94cf9c36b",
-                                 "net/tls/tls_main.c")
+    c = _get_function_line_scope(test_repo, "32857cf57f920cdc03b5095f08febec94cf9c36b", "net/tls/tls_main.c")
     for f, s in c.items():
         print(f, s)
