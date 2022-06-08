@@ -45,10 +45,12 @@ def _get_diff_line_num(diff):
             this_line = int(result.group(3)) - 1
         elif line.startswith("+"):
             this_line += 1
-            this_modify_lines.append(this_line)
+            if len(line[1:].strip()) > 0:  # only count non-empty changed line
+                this_modify_lines.append(this_line)
         elif line.startswith("-"):
             parent_line += 1
-            parent_modify_lines.append(parent_line)
+            if len(line[1:].strip()) > 0:
+                parent_modify_lines.append(parent_line)
         else:
             parent_line += 1
             this_line += 1
@@ -152,16 +154,35 @@ def _get_function_changed_info(function_line_scope, line_changed):
     return function_changed_info
 
 
-def get_function_changed(repo, sha1, language="C/C++"):
+def get_function_changed(repo, sha1, file_scope=None, language="C/C++"):
     """
-    :param sha1: only support non-initial commit, otherwise exception will be thrown
+    :param repo: Repo object
+    :param sha1: only support non-initial commit, otherwise runtime exception will be thrown
+    :param file_scope: function changed in specific files (None or set)
+    :param language: extract function changed in files related to the given language
     """
     if language != "C/C++":
         return "Language %s NOT Supported" % language
 
     src_suffix = {"C/C++": ('.c', '.cpp', '.cc', '.cxx', '.cp', '.C', '.CC', '.c++', '.C++', '.hpp', '.h', '.hh')}
 
-    changed_files, renamed_files = get_file_changed(repo, sha1)
+    all_changed_files, all_renamed_files = get_file_changed(repo, sha1)
+    if file_scope is None:
+        changed_files = all_changed_files
+        renamed_files = all_renamed_files
+    else:
+        assert type(file_scope) == set
+        changed_files = list(file_scope.intersection(all_changed_files))
+        renamed_files = []
+        for [a_path, b_path] in all_renamed_files:
+            if a_path in file_scope or b_path in file_scope:
+                renamed_files.append([a_path, b_path])
+
+    # FIXME: Improve the efficiency to handle numerous files
+    if len(changed_files) + len(renamed_files) > 800:
+        print("Warning: %s modifies too many files(>800): %s." % (sha1, len(changed_files) + len(renamed_files)))
+        return "Too Many Changed Files, Ignore All."
+
     changed_functions = set()
     for file in changed_files:
         if any(file.endswith(x) for x in src_suffix[language]):
