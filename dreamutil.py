@@ -121,7 +121,7 @@ def _get_function_line_scope(repo, sha1, file_name):
         if last_func_name is not None:
             if function_line_scope[last_func_name][-1][1] > start_line_num:
                 function_line_scope[last_func_name][-1][1] = start_line_num - 1
-                # print(sha1, file_name, last_func_name, "->", function_line_scope[last_func_name][-1][1])
+                print(sha1, file_name, last_func_name, "->", function_line_scope[last_func_name][-1][1])
 
         if func_name not in function_line_scope:
             function_line_scope[func_name] = [[start_line_num, end_line_num]]
@@ -139,18 +139,52 @@ def _get_function_changed_info(function_line_scope, line_changed):
     :return: { function: [line, ...] }
     """
     function_changed_info = dict()
-    for line in line_changed:
-        found_flag = False
-        for func_name, scope_list in function_line_scope.items():
-            for scope in scope_list:
-                if scope[0] <= line <= scope[1]:
-                    if func_name in function_changed_info:
-                        function_changed_info[func_name].append(line)
-                    else:
-                        function_changed_info[func_name] = [line]
-                    found_flag = True
-            if found_flag:
-                break
+
+    # O(m*n), where m = # of functions, n = # of lines.
+    # for line in line_changed:
+    #     found_flag = False
+    #     for func_name, scope_list in function_line_scope.items():
+    #         for scope in scope_list:
+    #             if scope[0] <= line <= scope[1]:
+    #                 if func_name in function_changed_info:
+    #                     function_changed_info[func_name].append(line)
+    #                 else:
+    #                     function_changed_info[func_name] = [line]
+    #                 found_flag = True
+    #         if found_flag:
+    #             break
+
+    func_list = []
+    for func_name, scope_list in function_line_scope.items():
+        for scope in scope_list:
+            func_list.append([scope, func_name])
+
+    line_list = sorted(line_changed, reverse=False)
+    func_list = sorted(func_list, key=lambda x: x[0][0], reverse=False)
+
+    i = 0
+    j = 0
+    line_len = len(line_list)
+    func_len = len(func_list)
+    while i < line_len and j < func_len:
+        this_func_start = func_list[j][0][0]
+        this_func_end = func_list[j][0][1]
+        if this_func_start <= line_list[i] <= this_func_end:
+            this_func_name = func_list[j][1]
+            if this_func_name not in function_changed_info:
+                function_changed_info[this_func_name] = [line_list[i]]
+            else:
+                function_changed_info[this_func_name].append(line_list[i])
+
+            while i + 1 < line_len and line_list[i + 1] <= this_func_end:
+                i += 1
+                function_changed_info[this_func_name].append(line_list[i])
+            i += 1
+            j += 1
+        elif line_list[i] < this_func_start:
+            i += 1
+        else:
+            j += 1
     return function_changed_info
 
 
@@ -178,10 +212,10 @@ def get_function_changed(repo, sha1, file_scope=None, language="C/C++"):
             if a_path in file_scope or b_path in file_scope:
                 renamed_files.append([a_path, b_path])
 
-    # FIXME: Improve the efficiency to handle numerous files
-    if len(changed_files) + len(renamed_files) > 800:
-        print("Warning: %s modifies too many files(>800): %s." % (sha1, len(changed_files) + len(renamed_files)))
-        return "Too Many Changed Files, Ignore All."
+    # Under Test: Improve the efficiency to handle numerous files
+    # if len(changed_files) + len(renamed_files) > 800:
+    #     print("Warning: %s modifies too many files(>800): %s." % (sha1, len(changed_files) + len(renamed_files)))
+    #     return "Too Many Changed Files, Ignore All."
 
     changed_functions = set()
     for file in changed_files:
@@ -244,13 +278,12 @@ def get_function_changed(repo, sha1, file_scope=None, language="C/C++"):
 
 if __name__ == "__main__":
     test_repo = git.Repo("/home/ssjjcao/linux")
-    print(get_function_changed(test_repo, "32857cf57f920cdc03b5095f08febec94cf9c36b"))
+    print(get_function_changed(test_repo, "975ff7f3324af33e218e3d0abf5797c2b67f97d7"))
 
-    print(get_file_changed(test_repo, "32857cf57f920cdc03b5095f08febec94cf9c36b"))
+    # print(get_file_changed(test_repo, "32857cf57f920cdc03b5095f08febec94cf9c36b"))
 
-    a, b = _get_diff_line_num(test_repo.git.diff('32857cf57f920cdc03b5095f08febec94cf9c36b~',
-                                                 "32857cf57f920cdc03b5095f08febec94cf9c36b",
-                                                 '--', "net/tls/tls_main.c"))
-    c = _get_function_line_scope(test_repo, "32857cf57f920cdc03b5095f08febec94cf9c36b", "net/tls/tls_main.c")
-    for f, s in c.items():
-        print(f, s)
+    # a, b = _get_diff_line_num(test_repo.git.diff('975ff7f3324af33e218e3d0abf5797c2b67f97d7~',
+    #                                              "975ff7f3324af33e218e3d0abf5797c2b67f97d7",
+    #                                              '--', "net/ipv4/nexthop.c"))
+    # c = _get_function_line_scope(test_repo, "975ff7f3324af33e218e3d0abf5797c2b67f97d7~", "net/ipv4/nexthop.c")
+    # print(_get_function_changed_info(c, a))
